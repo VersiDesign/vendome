@@ -33,6 +33,7 @@ function connectShineHover(root, hoverTarget) {
   function fadeOut(pass) {
     if (!pass || pass.fade) return;
     if (current === pass) current = null;
+    pass.motion.pause();
     pass.fade = pass.group.animate([{opacity:1},{opacity:0}],
       {duration:180,easing:'ease-out',fill:'forwards'});
     pass.fade.finished.then(() => remove(pass), () => {});
@@ -61,10 +62,27 @@ function connectShineHover(root, hoverTarget) {
     hoverTarget.dataset.shineRuns = String(Number(hoverTarget.dataset.shineRuns || 0) + 1);
     motion.finished.then(() => remove(pass), () => {});
   }
+  // A stationary pointer restored over the logo by navigation is not a new hover.
+  let needsExit = hoverTarget.matches(':hover');
+  let seenOutside = false;
+  const observeOutside = event => {
+    if (event.pointerType === 'touch' || hoverTarget.contains(event.target)) return;
+    seenOutside = true;
+    needsExit = false;
+    document.removeEventListener('pointermove', observeOutside, true);
+  };
+  document.addEventListener('pointermove', observeOutside, true);
   hoverTarget.addEventListener('pointerenter', event => {
-    if (event.pointerType !== 'touch') start();
+    if (event.pointerType === 'touch' || needsExit) return;
+    if (!seenOutside && !event.relatedTarget) return;
+    start();
   });
-  hoverTarget.addEventListener('pointerleave', () => fadeOut(current));
+  hoverTarget.addEventListener('pointerleave', () => {
+    needsExit = false;
+    seenOutside = true;
+    document.removeEventListener('pointermove', observeOutside, true);
+    fadeOut(current);
+  });
   const link = hoverTarget.closest('a');
   if (link) {
     if (!link.hasAttribute('aria-label') && !link.hasAttribute('aria-labelledby')) {
